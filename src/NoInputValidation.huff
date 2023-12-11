@@ -1,0 +1,216 @@
+
+/**
+ * A simple ether bank. Deposit ether (msg.value) through direct sending to the contract address to have an ether-balance in it
+ * It supports:
+ *  - Transferring your ether-balance to another address of your choice
+ *  - Withdrawing, if your ether balance is enough for the withdrawal
+ *
+ * But there's a bug, no input validation on the address a user wishes to transfer their ether-balance to before updating it's mapping storage, 
+ * this could cause permanent loss of funds as if the address has dirty bits, that means the ether can never be withdrawn or transferred out
+ */
+
+
+/// INTERFACE
+#define function transfer(address to, uint256 amount) nonpayable returns()
+#define function withdraw(uint256 amount) nonpayable returns()
+#define function balanceOf(address addr) nonpayable returns(uint256)
+
+// ERRORS
+#define error InsufficientBalance()
+#define error SendEtherFailed()
+
+
+#define constant BALANCE_OF_SLOT = 0x00
+
+
+#define macro MAIN() = {
+    // if value is sent with tx, assune it's a deposit and call deposit function
+    callvalue DEPOSIT_JUMPDEST jumpi
+
+    // else do a function dispatch and revert if sent function_sig not amount expected
+    0x00 calldataload 0xe0 shr
+    dup1 __FUNC_SIG(transfer) eq TRANSFER_JUMPDEST jumpi
+    dup1 __FUNC_SIG(withdraw) eq WITHDRAW_JUMPDEST jumpi
+    __FUNC_SIG(balanceOf) eq BALANCE_OF_JUMPDEST jumpi
+    0x00 0x00 revert
+
+    // Implementations
+    DEPOSIT_JUMPDEST:
+        DEPOSIT_IMPL()
+
+    TRANSFER_JUMPDEST:
+        TRANSFER_IMPL()
+
+    WITHDRAW_JUMPDEST:
+        WITHDRAW_IMPL()
+    
+    BALANCE_OF_JUMPDEST:
+        BALANCE_OF_IMPL()
+}
+
+
+
+#define macro DEPOSIT_IMPL() = {
+    caller                                                                      // [caller]
+    GET_ADDRESSES_BALANCE_OF_SLOT()                                             // [slot]
+    dup1                                                                        // [slot, slot]
+    sload                                                                       // [balance, slot]
+    
+    callvalue                                                                   // [value, balance, slot]
+    add                                                                         // [(value + balance), slot]
+    swap1                                                                       // [slot, (value + balance)]
+    sstore                                                                      // []
+    
+    stop
+}
+
+
+#define macro TRANSFER_IMPL() = {
+    // get to and amount
+    0x24                                                                        // [0x24]
+    0x04                                                                        // [0x04, 0x24]
+    calldataload                                                                // [to, 0x24]
+    swap1                                                                       // [0x24, to]
+    calldataload                                                                // [amount, to]
+
+    // get the balance and slot of msg.sender
+    caller                                                                      // [msg.sender, amount, to]
+    GET_ADDRESSES_BALANCE_OF_SLOT()                                             // [slot, amount, to]
+    dup1                                                                        // [slot, slot, amount, to]
+    sload                                                                       // [balance, slot, amount, to]
+    
+    // update the callers balance, revert if not enough balance in safe sub
+    dup3                                                                        // [amount, balance, slot, amount, to]
+    swap1                                                                       // [balance, amount, slot, amount, to]
+    SAFE_DEDUCT_BALANCE()                                                       // [newBal, slot, amount, to]
+    swap1                                                                       // [slot, newBal, amount, to]
+    sstore                                                                      // [amount, to]
+
+
+    // get the balance and slot of to
+    swap1                                                                       // [to, amount]
+    GET_ADDRESSES_BALANCE_OF_SLOT()                                             // [slot, amount]
+    dup1                                                                        // [slot, slot, amount]
+    sload                                                                       // [balance, slot, amount]
+    
+    // update the callers balance
+    swap1                                                                       // [slot, balance, amount]
+    swap2                                                                       // [amount, balance, slot]
+    add                                                                         // [(amount + balance), slot]
+    swap1                                                                       // [slot, (amount + balance)]
+    sstore                                                                      // []
+    
+    stop
+}
+
+
+
+#define macro WITHDRAW_IMPL() = {
+    // get the amount to withdraw
+    0x04                                                                        // [0x04]
+    calldataload                                                                // [amount]
+
+    // get the balance and slot of msg.sender
+    caller                                                                      // [msg.sender, amount]
+    GET_ADDRESSES_BALANCE_OF_SLOT()                                             // [slot, amount]
+    dup1                                                                        // [slot, slot, amount]
+    sload                                                                       // [balance, slot, amount]
+    
+    // update the callers balance, revert if not enough balance in safe sub
+    dup3                                                                        // [amount, balance, slot, amount]
+    swap1                                                                       // [balance, amount, slot, amount]
+    SAFE_DEDUCT_BALANCE()                                                       // [newBal, slot, amount]
+    swap1                                                                       // [slot, newBal, amount]
+    sstore                                                                      // [amount]
+    
+    // send amount to caller
+    0x00                                                                        // [0x00, amount]
+    0x00                                                                        // [0x00, 0x00, amount]
+    0x00                                                                        // [0x00, 0x00, 0x00, amount]
+    0x00                                                                        // [0x00, 0x00, 0x00, 0x00, amount]
+    swap4                                                                       // [amount, 0x00, 0x00, 0x00, 0x00]
+    caller                                                                      // [msg.sender, amount, 0x00, 0x00, 0x00, 0x00]
+    gas                                                                         // [gas, msg.sender, amount, 0x00, 0x00, 0x00, 0x00]
+    call                                                                        // [success]
+    
+    // if call was successful, end execution
+    end_execution                                                               // [end_execution, success]
+    jumpi                                                                       // []
+    
+    // withdraw failed
+    __ERROR(SendEtherFailed)                                                    // [SendEtherFailed]
+    0x00                                                                        // [0x00, SendEtherFailed]
+    mstore                                                                      // []
+    0x04                                                                        // [0x04]
+    0x00                                                                        // [0x00, 0x04]
+    revert                                                                      // []
+
+    end_execution:
+        stop
+}
+
+#define macro BALANCE_OF_IMPL() = {
+    // get addr
+    0x04                                                                        // [0x04]
+    calldataload                                                                // [addr]
+
+    // get balance from slot
+    GET_ADDRESSES_BALANCE_OF_SLOT()                                             // [slot]
+    sload                                                                       // [balance]
+    
+    // store in memory
+    0x00                                                                        // [0x00, balance]
+    mstore                                                                      // []
+    
+    // return
+    0x20                                                                        // [0x20]
+    0x00                                                                        // [0x00, 0x20]
+    return                                                                      // []
+}
+
+
+
+
+
+
+
+
+/// HELPERs
+
+// used to get slot of where the balance of a user is stored, same as solidity's mapping format
+#define macro GET_ADDRESSES_BALANCE_OF_SLOT() = takes(1) returns(1) {
+    // expected stack                                                           // [address]
+
+    0x00                                                                        // [0x00, address]
+    mstore                                                                      // []
+    
+    [BALANCE_OF_SLOT]                                                           // [BALANCE_OF_SLOT]
+    0x20                                                                        // [0x20, BALANCE_OF_SLOT]
+    mstore                                                                      // []
+    
+    0x40                                                                        // [0x40]
+    0x00                                                                        // [0x00, 0x40]
+    sha3                                                                        // [hash]
+}
+
+// deduct an amount from a user's balance, revert with custom error if underflow possible
+#define macro SAFE_DEDUCT_BALANCE() = takes(2) returns(1) {
+    // expected stack                                                           // [a, b]
+
+    dup2                                                                        // [b, a, b]
+    dup2                                                                        // [a, b, a, b]
+    lt                                                                          // [(a < b), a, b]
+    iszero                                                                      // [((a < b) == 0), a, b]
+    sub_jumpdest                                                                // [sub_jumpdest, ((a < b) == 0), a, b]
+    jumpi                                                                       // [a, b]
+
+    __ERROR(InsufficientBalance)                                                // [InsufficientBalance_error_sig, a, b]
+    0x00                                                                        // [0x00, InsufficientBalance_error_sig, a, b]
+    mstore                                                                      // [a, b]
+    0x04                                                                        // [0x04, a, b]
+    0x00                                                                        // [0x00, 0x04, a, b]
+    revert                                                                      // [a, b]
+
+    sub_jumpdest:
+        sub                                                                     // [(a - b)]
+}
