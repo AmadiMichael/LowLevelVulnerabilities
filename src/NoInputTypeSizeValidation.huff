@@ -5,7 +5,7 @@
  *  - Transferring your ether-balance to another address of your choice
  *  - Withdrawing, if your ether balance is enough for the withdrawal
  *
- * But there's a bug, no input validation on the address a user wishes to transfer their ether-balance to before updating it's mapping storage, 
+ * But there's a bug, no input type size validation on the address a user wishes to transfer their ether-balance to before updating it's mapping storage, 
  * this could cause permanent loss of funds as if the address has dirty bits, that means the ether can never be withdrawn or transferred out
  */
 
