@@ -20,7 +20,7 @@
 #define error SendEtherFailed()
 
 
-#define constant BALANCE_OF_SLOT = 0x00
+#define constant BALANCE_OF_SLOT = FREE_STORAGE_POINTER() // 0x00
 
 
 #define macro MAIN() = {
@@ -65,6 +65,7 @@
 }
 
 
+/// @custom:bug Function vulnerable to the bug. Explanation and solution can be found in the Readme. Exploitation POC can be found in the test folder
 #define macro TRANSFER_IMPL() = {
     // get to and amount
     0x24                                                                        // [0x24]

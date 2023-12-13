@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import {Test, console2} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {HuffDeployer} from "foundry-huff/HuffDeployer.sol";
 
 interface NoInputValidation {
@@ -18,8 +18,13 @@ contract CounterTest is Test {
 
     function setUp() public {
         // deploy
-        noInputValidation =
-            NoInputValidation((HuffDeployer.config().with_evm_version("paris").deploy("NoInputValidation")));
+        noInputValidation = NoInputValidation(
+            (HuffDeployer.config().with_evm_version("paris").deploy("NoInputValidation/NoInputValidation.huff"))
+        );
+        assertTrue(
+            address(noInputValidation) != address(0) && address(noInputValidation).code.length > 0,
+            "noInputValidation not deployed"
+        );
     }
 
     function test_poc() external {
