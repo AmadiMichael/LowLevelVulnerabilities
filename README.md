@@ -1,4 +1,4 @@
-# LOW LEVEL VULNERABILITIES AND POCs
+# Low level vulnerabilities AND POCs
 
 Examples and POCs of Vulnerabilities that are unique to EVM contracts written without the guardrails of higher level languages like solidity or vyper
 
@@ -28,3 +28,15 @@ Examples and POCs of Vulnerabilities that are unique to EVM contracts written wi
         exit
 }
 ```
+
+## Ensure that addresses being called, static-called or delegate-called have code deployed to them, calling an address without code is always successful. If you're sure the address has and will always have code deployed to it, then this check can be omitted to save runtime gas costs.
+
+## Ensure that your code reverts after comparing all supported function signatures and not matching any. Omitting this can mean that the execution continues into other parts of your bytecode which you most likely don't want.
+
+## Ensure overflow and underflow are always checked when not desired
+
+### Remember that while division never overflows/underflows, signed division (sdiv opcode) will overflow when you divide the minimum of a signed type by -1. this should be checked if not desired
+
+## When calling precompiles, be aware that on error/”failure”, the call is still successful. A failed precompile call simply has 0 as the returndatasize.
+
+## When dividing or modulo'in by 0 at a low level i.e using huff, yul, bytecode etc. It does not revert with Panic(18) as solidity would do, it returns 0. If this behavior is not desired it should be checked. Basically, x/0 = 0 and x % 0 = 0.
