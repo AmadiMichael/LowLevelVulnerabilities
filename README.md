@@ -1,6 +1,6 @@
 # Low level vulnerabilities & POCs
 
-Examples and POCs of Vulnerabilities that are unique to EVM contracts written without the guardrails of higher level languages like solidity or vyper
+Examples and POCs of Vulnerabilities that are unique to EVM contracts written without the guardrails of higher level languages like solidity or vyper. Still adding more POCs
 
 ## Validate all input bit size
 
@@ -35,7 +35,9 @@ Validate that inputs do not exceed the size of it's expected type and either rev
 
 Ensure that your code reverts after comparing all supported function signatures, fallback etc and not matching any. Omitting this can mean that the execution continues into other parts of your bytecode which you most likely don't want. This is trivial but can be forgotten and if so can have critical consequences.
 
-## Ensure that addresses being called, static-called or delegate-called have code deployed to them, calling an address without code is always successful. If you're sure the address has and will always have code deployed to it, then this check can be omitted to save runtime gas costs.
+## Ensure that addresses being called, static-called or delegate-called have code deployed to them
+
+Calling an address without code is always successful. If you're sure the address has and will always have code deployed to it, then this check can be omitted to save runtime gas costs.
 
 ## Ensure overflow and underflow are always checked when not desired
 
@@ -48,6 +50,10 @@ int8 x = int8(-128) / int8(-1);
 This will revert as is from solidity >= 0.8.0 since this should be 128 but type(int8).max is 127 so it overflows.
 But if put in an unchecked block this overflow is ignored and overflows to the type(int8).min (since the overflow is just by 1). Hence x will be -128 which is incorrect and can be critical if not desired.
 
-## When calling precompiles, be aware that on error/”failure”, the call is still successful. A failed precompile call simply has 0 as the returndatasize.
+## When calling precompiles, check the returndatasize not the success of the call to determine if it failed
 
-## When dividing or modulo'in by 0 at a low level i.e using huff, yul, bytecode etc. It does not revert with Panic(18) as solidity would do, it returns 0. If this behavior is not desired it should be checked. Basically, x/0 = 0 and x % 0 = 0.
+When calling precompiles, be aware that on error/”failure”, the call is still successful. A failed precompile call simply has a returndatasize of 0.
+
+## When dividing or modulo'in check that the denominator is not 0
+
+At the evm level and even in yul/inline assembly, when dividing or modulo'ing by 0, It does not revert with Panic(18) as solidity would do, its result 0. If this behavior is not desired it should be checked. Basically, x / 0 = 0 and x % 0 = 0.
