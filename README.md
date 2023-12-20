@@ -41,7 +41,7 @@ Calling an address without code is always successful. If you're sure the address
 
 ## Ensure overflow and underflow are always checked when not desired
 
-Also remember that while division never overflows/underflows, signed division (`sdiv`` opcode) will overflow when you divide the minimum of a signed type by -1. this should be checked if not desired. E.g
+Also remember that while division never overflows/underflows, signed division (`sdiv` opcode) will overflow when you divide the minimum of a signed type by -1. this should be checked if not desired. E.g
 
 ```
 int8 x = int8(-128) / int8(-1);
