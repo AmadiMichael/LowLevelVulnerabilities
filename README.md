@@ -2,7 +2,9 @@
 
 Examples and POCs of Vulnerabilities that are unique to EVM contracts written without the guardrails of higher level languages like solidity or vyper
 
-## Validate that inputs types are of the right bit size and format and either revert or clean the unused bits depending on your use case before using that value
+## Validate all input bit size
+
+Validate that inputs do not exceed the size of it's expected type and either revert or clean the unused bits depending on your use case before using that value
 
 - The file `src/NoInputTypeSizeValidation.huff` holds a contract vulnerable to this and `test/NoInputTypeSizeValidation.t.sol` holds the POC for it. The vulnerability can lead to permanent loss of funds when transfer is called with the an address greater than 160 bits. Normally this should be checked and revert if the bit size of the expected type (in this case an address) is less than the bit size of what was sent. e.g
 
@@ -29,13 +31,22 @@ Examples and POCs of Vulnerabilities that are unique to EVM contracts written wi
 }
 ```
 
-## Ensure that addresses being called, static-called or delegate-called have code deployed to them, calling an address without code is always successful. If you're sure the address has and will always have code deployed to it, then this check can be omitted to save runtime gas costs.
+## End execution after function dispatching
 
-## Ensure that your code reverts after comparing all supported function signatures and not matching any. Omitting this can mean that the execution continues into other parts of your bytecode which you most likely don't want.
+Ensure that your code reverts after comparing all supported function signatures, fallback etc and not matching any. Omitting this can mean that the execution continues into other parts of your bytecode which you most likely don't want. This is trivial but can be forgotten and if so can have critical consequences.
+
+## Ensure that addresses being called, static-called or delegate-called have code deployed to them, calling an address without code is always successful. If you're sure the address has and will always have code deployed to it, then this check can be omitted to save runtime gas costs.
 
 ## Ensure overflow and underflow are always checked when not desired
 
-### Remember that while division never overflows/underflows, signed division (sdiv opcode) will overflow when you divide the minimum of a signed type by -1. this should be checked if not desired
+Also remember that while division never overflows/underflows, signed division (`sdiv`` opcode) will overflow when you divide the minimum of a signed type by -1. this should be checked if not desired. E.g
+
+```
+int8 x = int8(-128) / int8(-1);
+```
+
+This will revert as is from solidity >= 0.8.0 since this should be 128 but type(int8).max is 127 so it overflows.
+But if put in an unchecked block this overflow is ignored and overflows to the type(int8).min (since the overflow is just by 1). Hence x will be -128 which is incorrect and can be critical if not desired.
 
 ## When calling precompiles, be aware that on error/”failure”, the call is still successful. A failed precompile call simply has 0 as the returndatasize.
 
