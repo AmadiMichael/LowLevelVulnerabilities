@@ -31,6 +31,15 @@ Validate that inputs do not exceed the size of it's expected type and either rev
 }
 ```
 
+## Using solidity memory scratch space to store values between two different assembly blocks can go very wrong
+
+When learning inline assembly, we are told that the first 64 bytes of memory is safe for us to use however we like and we are sure it would not be tampered with, but in reality, this is not always true!. Solidity actually uses the scratch space for operations like reverting with it's panic error (which shouldn't affect us as if the code is reverting with a panic error then nothing that was meant to be executed next will be executed). But there's one more type of operation that solidity uses the scratch space to perform and not many people are aware of this. Solidity uses the scratch space to calculate (hash) the storage slot of mappings and arrays. You can imagine how this could easily go wrong. We can see 2 contracts vulnerable to this in `src/NotSoMemorySafe.sol`. The first is vulnerable due to accessing value stored at the scratch space after accessing a mapping's value, the second is vulnerable due to accessing value stored at the scratch space after accessing an arrays's value.
+
+Genearally to prevent this you can follow either of this patterns;
+
+- Read values stored in the scratch space only while in the same assembly block it was stored in. Solidity guaraantees it won't touch the scratch space while in an assembly block.
+- If you need this value across assembly blocks, be sure that inbetween the assembly block, you read to a 2D mapping or array occurs. Reads include `type x = mappingName[key];` and for numerical values `mappingName[key] += anotherValueOfSameType;`
+
 ## End execution after function dispatching
 
 Ensure that your code reverts after comparing all supported function signatures, fallback etc and not matching any. Omitting this can mean that the execution continues into other parts of your bytecode which you most likely don't want. This is trivial but can be forgotten and if so can have critical consequences.
